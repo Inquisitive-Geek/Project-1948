@@ -1,7 +1,9 @@
 import re
 # import string
 from docx import Document
-
+import csv
+import mmap
+import re
 #Prepare function to read in documents
 def read_doc_file_to_string(file_name, read_mode):
     f = open(file_name, read_mode)
@@ -123,3 +125,98 @@ def clean_text(text_arr):
         text = normalize_text(text)
         cleaned_text_arr.append(text)
     return cleaned_text_arr
+
+
+##Next we will count keywords and relevant phrases.
+
+def count_keywords_and_phrases(list_of_interviews):
+    keywords_and_phrases = []
+    with open('Keywords_And_Phrases.csv', 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            keywords_and_phrases.append(row[0])
+    #keywords are already stored in a csv
+    percentage_used = [] 
+    for word in keywords_and_phrases:
+        sum_used = 0
+        for interview in list_of_interviews:
+            if ((word in interview) or (word.lower() in interview)):
+                sum_used += 1
+        percentage = (sum_used/len(list_of_interviews)) * 100
+        #this will tell us how many interviews this particular word was used in
+        percentage_used.append(percentage)
+        #each word will have a corresponding percentage so word_0 has a
+        #percentage of percentage_0
+    quicksort(percentage_used, keywords_and_phrases, 0,
+              len(percentage_used) - 1)
+    #sort so it will be easier to see what words are used most frequently
+    #as the percentages are sorted so is the array of words so each words
+    #percentage is still easy to find
+    word_and_percentage_used = open("word_and_percentage_used.csv", "w")
+    word_and_percentage_used.write("Keyword,Percentage\n")
+    
+    for i in range(len(percentage_used) - 1, 0, -1):
+        word_and_percentage_used.write(keywords_and_phrases[i] + ',' +
+                                    str(percentage_used[i]) + '\n')
+    word_and_percentage_used.close()
+    print("finished")
+
+def count_words(list_of_interviews):
+    keywords_and_phrases = []
+    with open('Keywords_And_Phrases.csv', 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            keywords_and_phrases.append(row[0])
+    frequency = []
+    for i in range(len(keywords_and_phrases)):
+        frequency.append(0)
+    for interview in list_of_interviews:
+        for i in range(len(keywords_and_phrases)):
+            frequency[i] += interview.count(keywords_and_phrases[i])
+            frequency[i] += interview.count(keywords_and_phrases[i].lower())
+    
+    quicksort(frequency, keywords_and_phrases, 0, len(frequency) - 1)
+    word_and_freq = open("word_and_frequency.csv", "w")
+    word_and_freq.write("keyword,frequency\n")
+    for i in range(len(frequency) - 1, 0, -1):
+        word_and_freq.write(keywords_and_phrases[i]
+                            + ',' + str(frequency[i]) + '\n')
+    word_and_freq.close()
+    print("finished")
+    
+#Standard quicksort algorithm just had to tweak so it will sort two arrays
+#at a time
+def quicksort(list, list_2, min, max):
+    if (min < max):
+        p = partition(list, list_2, min, max)
+        quicksort(list, list_2, min, p - 1)
+        quicksort(list, list_2, p + 1, max)
+
+def partition(list, list_2, min, max):
+    pivot = list[max]
+    i = min - 1
+    for j in range(min, max):
+        if list[j] < pivot:
+            i += 1
+            temp =list[j]
+            temp2 = list_2[j]
+            list[j] = list[i]
+            list_2[j] = list_2[i]
+            list[i] = temp
+            list_2[i] = temp2
+    if list[max] < list[i + 1]:
+        temp = list[max]
+        temp2 = list_2[max]
+        list[max] = list[i + 1]
+        list_2[max] = list_2[i + 1]
+        list[i + 1] = temp
+        list_2[i + 1] = temp2
+    return i + 1
+        
+    
+        
+            
+                
+
+
+            
