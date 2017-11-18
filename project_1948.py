@@ -4,6 +4,8 @@ from docx import Document
 import csv
 import mmap
 import re
+import PyDictionary
+import wordcloud
 #Prepare function to read in documents
 def read_doc_file_to_string(file_name, read_mode):
     f = open(file_name, read_mode)
@@ -212,11 +214,50 @@ def partition(list, list_2, min, max):
         list[i + 1] = temp
         list_2[i + 1] = temp2
     return i + 1
-        
-    
-        
-            
-                
+
+# With the use of regular expressions, the text belonging to only Interviewees is extracted and combined 
+# 2 outputs are returned:
+# one output is just the list of interviewee responses - txt_all
+# other output is list converted to text blob with commas removed and all words converted to lowercase - txt_combined
+def extract_interviewee(text_all, extracting_string, terminating_string):
+    import re
+    txt_all = []
+    for txt in text_all:
+        s =re.split(extracting_string, txt)
+        for i in range(0,(len(s))):
+            t = re.split(terminating_string, s[i])[0]
+            txt_all.append(t)
+    #The text belonging to all Interviewee's are joined together            
+    txt_combined = ','.join(txt_all)
+    # All the comma strings are replaced with no space
+    txt_combined = txt_combined.replace(',', '')
+    # All the text is converted to its lower case
+    txt_combined = txt_combined.lower()  
+    return txt_all, txt_combined
 
 
-            
+# Using PyDictionary creating the synonym table 
+# Creating the list of synonyms
+def synonym_collect(text,keyword_list):
+    from PyDictionary import PyDictionary
+    dictionary = PyDictionary()
+    synonym_table = {}
+    for keyword in keyword_list:
+        if len(keyword.split(' ')) == 1:
+            if (dictionary.synonym(keyword) != None):
+                synonym_list = dictionary.synonym(keyword)
+                synonym_table[keyword] = {len(re.findall(keyword.lower(), text)):
+                                      {synonym.lower():len(re.findall(synonym.lower(), text)) for synonym in synonym_list}}
+    return synonym_table
+        
+# Creating wordcloud for the words in the interviewees responses after removing stopwords
+def create_wordcloud(text):
+    from wordcloud import WordCloud, STOPWORDS
+    stopwords = set(STOPWORDS)
+    additional_stopwords = ['one','see','yes','really','yeah','maybe','say','know','think','well','lot','make','will','also','don','going',
+                           'go','something','everything']
+    for new_word in additional_stopwords:
+        stopwords.add(new_word)
+    wc = wordcloud.WordCloud(stopwords = stopwords).generate(text)
+    return wc              
+   
