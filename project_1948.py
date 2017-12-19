@@ -1,11 +1,23 @@
 import re
-# import string
+import string
 from docx import Document
+import nltk
+nltk.download('stopwords')
+nltk.download('wordnet')
+from nltk.corpus import stopwords
+from nltk.stem.wordnet import WordNetLemmatizer
 import csv
 import mmap
 import re
 import PyDictionary
 import wordcloud
+import gensim
+from gensim import corpora
+
+stop = set(stopwords.words('english'))
+exclude = set(string.punctuation)
+lemma = WordNetLemmatizer()
+
 #Prepare function to read in documents
 def read_doc_file_to_string(file_name, read_mode):
     f = open(file_name, read_mode)
@@ -233,8 +245,33 @@ def extract_interviewee(text_all, extracting_string, terminating_string):
     txt_combined = txt_combined.replace(',', '')
     # All the text is converted to its lower case
     txt_combined = txt_combined.lower()  
-    return txt_all, txt_combined
+    return txt_all, txt_combined 
 
+
+# The text is being cleaned and preprocessed before the topic model is built
+def clean_and_prep(text_all):
+    stop_free = " ".join([i for i in text_all.lower() if i not in stop and i not in ['interviewer', 'interviewee']])
+    punc_free = ''.join(ch for ch in stop_free if ch not in exclude)
+    normalized = " ".join(lemma.lemmatize(word) for word in punc_free.split())
+    return normalized
+
+# The topic model is being built below
+# The text corpus is inputted and the topic model is returned
+def build_topic_model(text_all, num_topics, passes):
+    # Creating the term dictionary of our corpus, where every unique term is assigned an index
+    dictionary = corpora.Dictionary([doc.split() for doc in text_all])
+
+    # Converting the list of documents (corpus) into Document Term Matrix using dictionary prepared above.
+    doc_term_matrix = [dictionary.doc2bow(doc.split()) for doc in text_all]
+
+    # Running LDA Model
+    # Creating the object for LDA model using Gensim library
+    Lda = gensim.models.ldamodel.LdaModel
+
+    # Running and training LDA model on the doc term matrix
+    ldamodel = Lda(doc_term_matrix, num_topics = num_topics, id2word = dictionary, passes = passes)
+    
+    return ldamodel
 
 # Using PyDictionary creating the synonym table 
 # Creating the list of synonyms
