@@ -42,9 +42,13 @@ stop_words = stop_words | stop_words_add_on
 
 #creating document collection
 interview_tokens = []
+j=0
 for interview in interview_list:
     interview = pjct.remove_grouped_text(interview)
     interview = pjct.remove_punctuation_characters(interview,interviewer=' ',interviewee=' ')
+    interview = interview.lower()
+    interview_list[j]=interview
+    j = j+1
     words = interview.split()
     words = [word.lower() for word in words if word.lower() not in stop_words]
     words = list({word for word in words if len(word)>2})
