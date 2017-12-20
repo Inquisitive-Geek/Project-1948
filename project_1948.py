@@ -3,6 +3,22 @@ import string
 import numpy as np
 import pandas as pd
 from docx import Document
+import nltk
+nltk.download('stopwords')
+nltk.download('wordnet')
+from nltk.corpus import stopwords
+from nltk.stem.wordnet import WordNetLemmatizer
+import csv
+import mmap
+import re
+import PyDictionary
+import wordcloud
+import gensim
+from gensim import corpora
+
+stop = set(stopwords.words('english'))
+exclude = set(string.punctuation)
+lemma = WordNetLemmatizer()
 
 #Prepare function to read in documents
 def read_doc_file_to_string(file_name, read_mode):
@@ -43,7 +59,7 @@ def remove_punctuation_characters(input_text):
     #upper (optional) is True if the words are to be upper case
     #lower (optional) is True if the words are to be lower case
     #title (optional) is True if the words are to have 'title' case
-def normalize_text(input_text,upper=False,lower=False,title=False):
+def normalize_text(input_text,upper=False,lower=False,title=False,sep=" "):
     words = input_text.split()
     output_text=""
     if upper:
@@ -117,6 +133,7 @@ def word_context(input_text, word_list, radius):
         print("ERROR IN TYPE")
     return output
 
+
 #function to break up test string by sentences
     #input_text is text to be split
 def sentences(input_text):
@@ -162,3 +179,178 @@ def words_in_sentences(sentence_list, words):
         if j==len(words):
             count_main = count_main+1
     return count_main
+
+#function to clean the data
+    #text_arr is the input array of strings -- each string is a transcript of the interview
+    #cleaned_text_arr is the outputs array of cleaned strings
+def clean_text(text_arr):
+    cleaned_text_arr = []
+    for text in text_arr:
+        # Remove grouped text like (laughing) etc.
+        text = remove_grouped_text(text)
+        # Remove punctuation characters and replace P: & I: with INTERVIEWER & INTERVIEWEE
+        text = remove_punctuation_characters(text)
+        # Normalize the input text
+        text = normalize_text(text)
+        cleaned_text_arr.append(text)
+    return cleaned_text_arr
+
+
+##Next we will count keywords and relevant phrases.
+
+def count_keywords_and_phrases(list_of_interviews):
+    keywords_and_phrases = []
+    with open('Keywords_And_Phrases.csv', 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            keywords_and_phrases.append(row[0])
+    #keywords are already stored in a csv
+    percentage_used = [] 
+    for word in keywords_and_phrases:
+        sum_used = 0
+        for interview in list_of_interviews:
+            if ((word in interview) or (word.lower() in interview)):
+                sum_used += 1
+        percentage = (sum_used/len(list_of_interviews)) * 100
+        #this will tell us how many interviews this particular word was used in
+        percentage_used.append(percentage)
+        #each word will have a corresponding percentage so word_0 has a
+        #percentage of percentage_0
+    quicksort(percentage_used, keywords_and_phrases, 0,
+              len(percentage_used) - 1)
+    #sort so it will be easier to see what words are used most frequently
+    #as the percentages are sorted so is the array of words so each words
+    #percentage is still easy to find
+    word_and_percentage_used = open("word_and_percentage_used.csv", "w")
+    word_and_percentage_used.write("Keyword,Percentage\n")
+    
+    for i in range(len(percentage_used) - 1, 0, -1):
+        word_and_percentage_used.write(keywords_and_phrases[i] + ',' +
+                                    str(percentage_used[i]) + '\n')
+    word_and_percentage_used.close()
+    print("finished")
+
+def count_words(list_of_interviews):
+    keywords_and_phrases = []
+    with open('Keywords_And_Phrases.csv', 'r') as f:
+        reader = csv.reader(f)
+        for row in reader:
+            keywords_and_phrases.append(row[0])
+    frequency = []
+    for i in range(len(keywords_and_phrases)):
+        frequency.append(0)
+    for interview in list_of_interviews:
+        for i in range(len(keywords_and_phrases)):
+            frequency[i] += interview.count(keywords_and_phrases[i])
+            frequency[i] += interview.count(keywords_and_phrases[i].lower())
+    
+    quicksort(frequency, keywords_and_phrases, 0, len(frequency) - 1)
+    word_and_freq = open("word_and_frequency.csv", "w")
+    word_and_freq.write("keyword,frequency\n")
+    for i in range(len(frequency) - 1, 0, -1):
+        word_and_freq.write(keywords_and_phrases[i]
+                            + ',' + str(frequency[i]) + '\n')
+    word_and_freq.close()
+    print("finished")
+    
+#Standard quicksort algorithm just had to tweak so it will sort two arrays
+#at a time
+def quicksort(list, list_2, min, max):
+    if (min < max):
+        p = partition(list, list_2, min, max)
+        quicksort(list, list_2, min, p - 1)
+        quicksort(list, list_2, p + 1, max)
+
+def partition(list, list_2, min, max):
+    pivot = list[max]
+    i = min - 1
+    for j in range(min, max):
+        if list[j] < pivot:
+            i += 1
+            temp =list[j]
+            temp2 = list_2[j]
+            list[j] = list[i]
+            list_2[j] = list_2[i]
+            list[i] = temp
+            list_2[i] = temp2
+    if list[max] < list[i + 1]:
+        temp = list[max]
+        temp2 = list_2[max]
+        list[max] = list[i + 1]
+        list_2[max] = list_2[i + 1]
+        list[i + 1] = temp
+        list_2[i + 1] = temp2
+    return i + 1
+
+# With the use of regular expressions, the text belonging to only Interviewees is extracted and combined 
+# 2 outputs are returned:
+# one output is just the list of interviewee responses - txt_all
+# other output is list converted to text blob with commas removed and all words converted to lowercase - txt_combined
+def extract_interviewee(text_all, extracting_string, terminating_string):
+    import re
+    txt_all = []
+    for txt in text_all:
+        s =re.split(extracting_string, txt)
+        for i in range(0,(len(s))):
+            t = re.split(terminating_string, s[i])[0]
+            txt_all.append(t)
+    #The text belonging to all Interviewee's are joined together            
+    txt_combined = ','.join(txt_all)
+    # All the comma strings are replaced with no space
+    txt_combined = txt_combined.replace(',', '')
+    # All the text is converted to its lower case
+    txt_combined = txt_combined.lower()  
+    return txt_all, txt_combined 
+
+
+# The text is being cleaned and preprocessed before the topic model is built
+def clean_and_prep(text_all):
+    stop_free = " ".join([i for i in text_all.lower() if i not in stop and i not in ['interviewer', 'interviewee']])
+    punc_free = ''.join(ch for ch in stop_free if ch not in exclude)
+    normalized = " ".join(lemma.lemmatize(word) for word in punc_free.split())
+    return normalized
+
+# The topic model is being built below
+# The text corpus is inputted and the topic model is returned
+def build_topic_model(text_all, num_topics, passes):
+    # Creating the term dictionary of our corpus, where every unique term is assigned an index
+    dictionary = corpora.Dictionary([doc.split() for doc in text_all])
+
+    # Converting the list of documents (corpus) into Document Term Matrix using dictionary prepared above.
+    doc_term_matrix = [dictionary.doc2bow(doc.split()) for doc in text_all]
+
+    # Running LDA Model
+    # Creating the object for LDA model using Gensim library
+    Lda = gensim.models.ldamodel.LdaModel
+
+    # Running and training LDA model on the doc term matrix
+    ldamodel = Lda(doc_term_matrix, num_topics = num_topics, id2word = dictionary, passes = passes)
+    
+    return ldamodel
+
+# Using PyDictionary creating the synonym table 
+# Creating the list of synonyms
+def synonym_collect(text,keyword_list):
+    from PyDictionary import PyDictionary
+    dictionary = PyDictionary()
+    synonym_table = {}
+    for keyword in keyword_list:
+        if len(keyword.split(' ')) == 1:
+            if (dictionary.synonym(keyword) != None):
+                synonym_list = dictionary.synonym(keyword)
+                synonym_table[keyword] = {len(re.findall(keyword.lower(), text)):
+                                      {synonym.lower():len(re.findall(synonym.lower(), text)) for synonym in synonym_list}}
+    return synonym_table
+        
+# Creating wordcloud for the words in the interviewees responses after removing stopwords
+def create_wordcloud(text):
+    from wordcloud import WordCloud, STOPWORDS
+    stopwords = set(STOPWORDS)
+    additional_stopwords = ['one','see','yes','really','yeah','maybe','say','know','think','well','lot','make','will','also','don','going',
+                           'go','something','everything']
+    for new_word in additional_stopwords:
+        stopwords.add(new_word)
+    wc = wordcloud.WordCloud(stopwords = stopwords).generate(text)
+    return wc              
+   
+
