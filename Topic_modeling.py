@@ -1,9 +1,13 @@
 import project_1948 as pjct
 import nltk
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+from nltk import pos_tag
+from nltk.tokenize import word_tokenize
 from gensim import corpora, models
 import docx as w
-nltk.download('stopwords')
-
+#nltk.download('stopwords')
+#nltk.download('averaged_perceptron_tagger')
+#nltk.download('wordnet')
 #pull interview files
 interview_1 = pjct.read_doc_file_to_string('Interview #1 - Participant 1.docx','rb')
 interview_2 = pjct.read_doc_file_to_string('Interview #2-Participant 2.docx','rb')
@@ -39,7 +43,7 @@ stop_words_add_on = {'okay','like','think','hello','feel','uhm','umm','really','
                      'also','said','much','going','little','tell','even','day','thing','quite'
                      'gora','things','people','still','could','show'}
 stop_words = stop_words | stop_words_add_on
-
+stemmer = PorterStemmer()
 #creating document collection
 interview_tokens = []
 j=0
@@ -50,7 +54,7 @@ for interview in interview_list:
     interview_list[j]=interview
     j = j+1
     words = interview.split()
-    words = [word.lower() for word in words if word.lower() not in stop_words]
+    words = [stemmer.stem(word).lower() for word in words if word.lower() not in stop_words]
     words = list({word for word in words if len(word)>2})
     interview_tokens.append(words)
     
@@ -61,23 +65,27 @@ dictionary = corpora.Dictionary(interview_tokens)
 corpus = [dictionary.doc2bow(interview) for interview in interview_tokens]
 del(interview)
 
+#Tfidf model
+tfidf = models.TfidfModel(corpus)
+weighted_corpus = tfidf[corpus]
+
 #LDA model implementation
 print('--Begin LDA--\n')
-LDA = models.ldamodel.LdaModel(corpus, num_topics = num_topics, id2word=dictionary, passes=30)
+LDA = models.ldamodel.LdaModel(weighted_corpus, num_topics = num_topics, id2word=dictionary, passes=30)
 LDA.print_topics(num_topics=num_topics, num_words=num_words)
 LDA_results = LDA.show_topics(num_topics=num_topics,num_words=num_words)
 print('--End LDA--\n')
 
 #HDP model implementation
 print('--Begin HDP--\n')
-HDP = models.hdpmodel.HdpModel(corpus,id2word=dictionary)
+HDP = models.hdpmodel.HdpModel(weighted_corpus,id2word=dictionary)
 HDP.print_topics(num_topics=num_topics,num_words=num_words)
 HDP_results = HDP.show_topics(num_topics=num_topics,num_words=num_words)
 print('--End HDP--\n')
 
 #LSI model implementation
 print('--Begin LSI--\n')
-LSI = models.lsimodel.LsiModel(corpus,num_topics=num_topics,id2word=dictionary)
+LSI = models.lsimodel.LsiModel(weighted_corpus,num_topics=num_topics,id2word=dictionary)
 LSI.print_topics(num_topics=num_topics,num_words=num_words)
 LSI_results = LSI.show_topics(num_topics=num_topics,num_words=num_words)
 print('--End LSI--\n')
@@ -85,13 +93,13 @@ print('--End LSI--\n')
 #create document with results...4 topics, 30 wds each for each model.
 folder = '/Users/JaredGallegos/Desktop/Project_1948/Interviews/'
 results = w.Document()
-results.add_heading('LDA model results',0)
+results.add_heading('LDA model results',1)
 for topic in LDA_results:
     results.add_paragraph(str(topic))
-results.add_heading('HDP model results',0)
+results.add_heading('HDP model results',1)
 for topic in HDP_results:
     results.add_paragraph(str(topic))
-results.add_heading('LSI model results',0)
+results.add_heading('LSI model results',1)
 for topic in HDP_results:
     results.add_paragraph(str(topic))
 results.save(folder+'Topic_model_results.docx')
