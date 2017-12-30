@@ -14,6 +14,7 @@ import networkx as nx
 #pull interview files
 
 #---RETRIEVING AND PREPARING INTERVIEWS---
+print('Pulling interviews')
 interview_1 = pjct.read_doc_file_to_string('Interview #1 - Participant 1.docx','rb')
 interview_2 = pjct.read_doc_file_to_string('Interview #2-Participant 2.docx','rb')
 interview_4 = pjct.read_doc_file_to_string('Interview#4Participant#4.docx','rb')
@@ -40,7 +41,6 @@ interview_list = [interview_1, interview_2, interview_4, interview_5, interview_
 interview_list2 = [interview_16,interview_17,interview_18,
                   interview_19,interview_20,interview_21]
 
-
 #words to ignore
 stop_words = set(nltk.corpus.stopwords.words('english'))
 stop_words_add_on = {'okay','like','think','hello','feel','uhm','umm','really','something',
@@ -52,6 +52,7 @@ stop_words = stop_words | stop_words_add_on
 stemmer = PorterStemmer()
 
 #creating document collection
+print('creating corpus...')
 interview_tokens = []
 j=0
 for interview in interview_list:
@@ -64,6 +65,7 @@ for interview in interview_list:
     words = [stemmer.stem(word).lower() for word in words if word.lower() not in stop_words]
     words = list({word for word in words if len(word)>2})
     interview_tokens.append(words)
+print('corpus created')
 
 #---IMPLEMENTING TOPIC MODELS---
     
@@ -79,28 +81,28 @@ tfidf = models.TfidfModel(corpus)
 weighted_corpus = tfidf[corpus]
 
 #LDA model implementation
-print('--Begin LDA--\n')
+print('---Begin LDA---\n')
 LDA = models.ldamodel.LdaModel(weighted_corpus, num_topics = num_topics, id2word=dictionary, passes=30)
 LDA.print_topics(num_topics=num_topics, num_words=num_words)
 LDA_results = LDA.show_topics(num_topics=num_topics,num_words=num_words)
-print('--End LDA--\n')
+print('---End LDA---\n')
 
 #HDP model implementation
-print('--Begin HDP--\n')
+print('---Begin HDP---\n')
 HDP = models.hdpmodel.HdpModel(weighted_corpus,id2word=dictionary)
 HDP.print_topics(num_topics=num_topics,num_words=num_words)
 HDP_results = HDP.show_topics(num_topics=num_topics,num_words=num_words)
-print('--End HDP--\n')
+print('---End HDP---\n')
 
 #LSI model implementation
-print('--Begin LSI--\n')
+print('---Begin LSI---\n')
 LSI = models.lsimodel.LsiModel(weighted_corpus,num_topics=num_topics,id2word=dictionary)
 LSI.print_topics(num_topics=num_topics,num_words=num_words)
 LSI_results = LSI.show_topics(num_topics=num_topics,num_words=num_words)
-print('--End LSI--\n')
+print('---End LSI---\n')
 
 #create document with results...4 topics, 30 wds each for each model.
-folder = '/Users/JaredGallegos/Desktop/Project_1948/Interviews/'
+'''folder = '/Users/JaredGallegos/Desktop/Project_1948/Interviews/'
 results = w.Document()
 results.add_heading('LDA model results',1)
 for topic in LDA_results:
@@ -112,8 +114,13 @@ results.add_heading('LSI model results',1)
 for topic in HDP_results:
     results.add_paragraph(str(topic))
 results.save(folder+'Topic_model_results.docx')
-
+LDA.save('LDA_model')
+HDP.save('HDP_model')
+LSI.save('LSI_model')
+print('Results and models saved')
+'''
 #---CREATING TOPIC GRAPHS---
+topics_for_connection = 1
 
 LDA_stats = {}
 HDP_stats = {}
@@ -123,13 +130,14 @@ LDA_graph = nx.Graph()
 HDP_graph = nx.Graph()
 LSI_graph = nx.Graph()
 
-interview_stats = [LDA_stats,HDP_stats,LSI_stats]
-graphs = [LDA_graph,HDP_graph,LSI_graph]
+interview_stats = [LDA_stats, HDP_stats,LSI_stats]
+graphs = [LDA_graph, HDP_graph,LSI_graph]
 models_list = [LDA, HDP, LSI]
 model_indices = {0:'LDA Model',1:'HDP Model',2:'LSI Model'}
 g=0
 n=0
 
+print('creating graphs')
 #determine topics in each interview and add interview to graph
 for model in models_list:
     for interview in interview_list2: 
@@ -140,66 +148,58 @@ for model in models_list:
         n+=1
     g+=1
     n=0
-del(j)
+
 
 
 #create edges between nodes that have a similar topic (topics only count if p>.50)
 #one graph for each model
-labels={}
+labels=[]
 g=0
 for graph in graphs:
     nodes_to_check = set(graph.nodes())
+    dict_of_labels = {}
     for node in graphs[g].nodes():
         nodes_to_check = nodes_to_check - {node}#remove node from set of nodes to compare with
         node_topics = []
-        labels[node]=''
+        topics=''
         for pair in interview_stats[g][node]: #get topics for the node.  Set labels.
-            if pair[1]>.50:
-                node_topics.append(pair[0])
-                labels[node] = labels[node]+str(pair[0])
+            node_topics.append(pair[0])
+            print('\t'+str(pair[0]))
+            topics = topics + str(pair[0])
+        print(topics)
+        dict_of_labels[node] = topics
+        print(dict_of_labels)
         for other_node in nodes_to_check: #check through for similar topics of nodes.  Add edge if similar topic.
             for pair in interview_stats[g][other_node]:
                 if pair[0] in node_topics:
                     graph.add_edge(node,other_node)
                     break
+    labels.append(dict_of_labels)
+    g+=1
 
-#create shells for graph layout based on num_topics and plot graphs
+#Plot graph using shell layout.  Shells determined by number of topics contained in interviews
 g=0
 for graph in graphs:
-    no_topic = []
-    one_topic = []
-    two_topic = []
-    three_topic = []
-    four_topic = []
-    five_topic = []
-    topic_nums = set({})
-    for node in graph.nodes():
-        if len(interview_stats[g][node])==1:
-            one_topic.append(node)
-            topic_nums |= {1}
-        elif len(interview_stats[g][node])==2:
-            two_topic.append(node)
-            topic_nums |= {2}
-        elif len(interview_stats[g][node])==3:
-            three_topic.append(node)
-            topic_nums |= {3}
-        elif len(interview_stats[g][node])==4:
-            four_topic.append(node)
-            topic_nums |= {4}
-        elif len(interview_stats[g][node])==5:
-            five_topic.append(node)
-            topic_nums |= {5}
-        else:
-            no_topic.append(node)
-            topic_nums |= {0}
-    shells = [five_topic,four_topic,three_topic,two_topic,one_topic,no_topic]
-    shells = [x for x in shells if len(x)>0]
+    shells = []
+    nodes = graph.nodes()
+    nodes.sort(key = lambda node:len(interview_stats[g][node]),reverse=True)#sort by decreasing number of topics
+    while len(nodes)!= 0:
+        current_num_topics = len(interview_stats[g][nodes[0]])
+        break_index = 0
+        try:
+            while len(interview_stats[g][nodes[break_index]])==current_num_topics:
+                break_index+=1
+        except IndexError:
+            pass
+        shells.append(nodes[:break_index])
+        nodes = nodes[break_index:]
     plt.figure()
-    nx.draw_networkx(graph,nx.shell_layout(graph,nlist=shells),labels=labels)
-    plt.title(model_indices[g]+', Number of topics: '+str(topic_nums))
+    nx.draw_networkx(graph,nx.shell_layout(graph,nlist=shells),labels=labels[g])
+    plt.title(model_indices[g])
     g+=1
     
-#calculate average degree of vertices
+#Getting vertex degree information
+print('---Begin graph stats---\n')
 avg_deg = [0,0,0]
 degrees = [[],[],[]]
 g=0
@@ -208,8 +208,12 @@ for graph in graphs:
    for node in graph.nodes():
        degrees[g].append(graph.degree(node))
    g+=1
+print('Average degrees: '+str(avg_deg))
+for j in range(len(degrees)):
+    print('Graph '+str(j+1)+' degrees: '+str(degrees[j])+'\n')
 
-#are graphs isomorphic
-print(nx.is_isomorphic(LDA_graph,HDP_graph))
-print(nx.is_isomorphic(LDA_graph,LSI_graph))
-print(nx.is_isomporphic(HDP_graph,LSI_graph))
+#are graphs isomorphic?
+print('LDA and HDP Isomorphic?: '+str(nx.is_isomorphic(LDA_graph,HDP_graph)))
+print('LDA and LSI Isomorphic?: '+str(nx.is_isomorphic(LDA_graph,LSI_graph)))
+print('HDP and LSI Isomorphic?: '+str(nx.is_isomorphic(HDP_graph,LSI_graph)))
+print('---End graph stats---\n')
