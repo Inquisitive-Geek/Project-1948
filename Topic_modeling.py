@@ -102,7 +102,7 @@ LSI_results = LSI.show_topics(num_topics=num_topics,num_words=num_words)
 print('---End LSI---\n')
 
 #create document with results...4 topics, 30 wds each for each model.
-'''folder = '/Users/JaredGallegos/Desktop/Project_1948/Interviews/'
+folder = '/Users/JaredGallegos/Desktop/Project_1948/Interviews/'
 results = w.Document()
 results.add_heading('LDA model results',1)
 for topic in LDA_results:
@@ -118,9 +118,9 @@ LDA.save('LDA_model')
 HDP.save('HDP_model')
 LSI.save('LSI_model')
 print('Results and models saved')
-'''
+
 #---CREATING TOPIC GRAPHS---
-topics_for_connection = 1
+min_common_topic_for_edge = 5
 
 LDA_stats = {}
 HDP_stats = {}
@@ -170,10 +170,12 @@ for graph in graphs:
         dict_of_labels[node] = topics
         print(dict_of_labels)
         for other_node in nodes_to_check: #check through for similar topics of nodes.  Add edge if similar topic.
+            common_docs = 0
             for pair in interview_stats[g][other_node]:
                 if pair[0] in node_topics:
-                    graph.add_edge(node,other_node)
-                    break
+                    common_docs+=1
+            if common_docs >= min_common_topic_for_edge:
+                graph.add_edge(node,other_node)
     labels.append(dict_of_labels)
     g+=1
 
