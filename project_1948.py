@@ -351,6 +351,42 @@ def create_wordcloud(text):
     for new_word in additional_stopwords:
         stopwords.add(new_word)
     wc = wordcloud.WordCloud(stopwords = stopwords).generate(text)
-    return wc              
-   
+    return wc                  
 
+#function to determine proportional frequency of a list of phrases.
+def proportional_phrase_use(text,phrases):
+    text = text.lower()
+    phrases = [phrase.lower() for phrase in phrases]
+    phrases.sort(key = lambda phrase: len(phrase),reverse=True)#sort phrases by decreasing length
+    phrase_usage = {}
+    usage_count = 0
+    for phrase in phrases:
+        phrase_usage[phrase]=len(re.findall(phrase,text))
+        for longer_phrase in phrases[:phrases.index(phrase)]:
+            if phrase in longer_phrase:
+                phrase_usage[phrase] = phrase_usage[phrase]-phrase_usage[longer_phrase]
+        usage_count = usage_count+phrase_usage[phrase]
+    total_words = float(len(text.split()))
+    return usage_count/total_words
+
+def phrase_spread(text, phrases, num_sections):
+    partition = np.linspace(0,len(text),num_sections+1,endpoint=True)
+    partition = [int(np.round(p)) for p in partition]
+    print(partition)
+    text = text.lower()
+    phrases= [phrase.lower() for phrase in phrases]
+    phrases.sort(key=lambda phrase: len(phrase),reverse=True)
+    sections = {}
+    phrase_appearance = {}
+    for j in range(0,num_sections):
+        appearance_count = 0
+        text_section=text[partition[j]:partition[j+1]+1]
+        for phrase in phrases:
+            phrase_appearance[phrase]=len(re.findall(phrase,text_section))
+            for longer_phrase in phrases[:phrases.index(phrase)]:
+                if phrase in longer_phrase:
+                    phrase_appearance[phrase] = phrase_appearance[phrase]-phrase_appearance[longer_phrase]
+            appearance_count = appearance_count+phrase_appearance[phrase]
+            print(appearance_count)
+        sections[j]=appearance_count
+    return sections
