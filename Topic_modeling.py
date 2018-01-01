@@ -151,8 +151,7 @@ for model in models_list:
 
 
 
-#create edges between nodes that have a similar topic (topics only count if p>.50)
-#one graph for each model
+#create edges between nodes that have a set number of similar topics (min_common_topic_for_edge)
 labels=[]
 g=0
 for graph in graphs:
